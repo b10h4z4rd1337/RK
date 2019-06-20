@@ -36,10 +36,12 @@ public class ABP {
 
 		class ReceivingHost extends CommonHost {
 
+			@Override
 			public void init() {
 				// TODO
 			}
-
+			
+			@Override
 			public void input(NWEmuPkt packet) {
 				// TODO
 			}

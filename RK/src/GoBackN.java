@@ -35,11 +35,13 @@ public class GoBackN {
 		}
 
 		class ReceivingHost extends CommonHost {
-
+			
+			@Override
 			public void init() {
 				// TODO
 			}
 
+			@Override
 			public void input(NWEmuPkt packet) {
 				// TODO
 			}
