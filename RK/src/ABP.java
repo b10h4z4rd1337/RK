@@ -5,7 +5,7 @@ public class ABP extends AbstractHost {
 	@Override
 	public Boolean output(NWEmuMsg message) {
 		// TODO
-		return new Boolean(false);
+		return Boolean.FALSE;
 	}
 
 	@Override
