@@ -1,6 +1,26 @@
 import fau.cs7.nwemu.*;
 
+public class ABP extends AbstractHost {
 
-public class ABP {
+	@Override
+	public Boolean output(NWEmuMsg message) {
+		// TODO
+		return null;
+	}
+
+	@Override
+	public void input(NWEmuPkt packet) {
+		// TODO
+	}
+
+	@Override
+	public void init() {
+		// TODO
+	}
+
+	@Override
+	public void timerInterrupt() {
+		// TODO
+	}
 
 }
