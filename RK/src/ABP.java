@@ -103,6 +103,7 @@ public class ABP {
 				// TODO
 				if (hasBiterror(packet) || packet.seqnum != this.seqnum) {
 					toLayer3(lastACK);
+					return;
 				}
 
 				NWEmuMsg message = new NWEmuMsg();
