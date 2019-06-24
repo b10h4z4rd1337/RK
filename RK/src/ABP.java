@@ -139,7 +139,9 @@ public class ABP {
 
 					// In case the sender sent a package that has already been received, send the
 					// last ACK package again
-					toLayer3(lastACK);
+					if (lastACK != null) {
+						toLayer3(lastACK);
+					}
 				}
 			}
 		}
