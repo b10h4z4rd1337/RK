@@ -6,11 +6,14 @@ public class ABP {
 
 	public static void main(String... args) {
 
-		class CommonHost extends AbstractHost {
+		abstract class CommonHost extends AbstractHost {
 
 			int seqnum = 0;
 
-			protected int buildChecksum(NWEmuPkt pkt) {
+			/*
+			 * Calculates the checksum for a NWEmu package
+			 */
+			protected int calculateChecksum(NWEmuPkt pkt) {
 				int sum = pkt.seqnum;
 				sum += pkt.acknum;
 				sum += pkt.flags;
@@ -22,8 +25,13 @@ public class ABP {
 				return sum;
 			}
 
+			/*
+			 * Takes a NWEmu package, calculates its checksum and compares it with its
+			 * checksum. Returns false, if the numbers are equal and no bit-error occurred,
+			 * otherwise true
+			 */
 			protected boolean hasBiterror(NWEmuPkt pkt) {
-				return buildChecksum(pkt) == pkt.checksum ? false : true;
+				return calculateChecksum(pkt) == pkt.checksum ? false : true;
 			}
 		}
 
@@ -38,22 +46,25 @@ public class ABP {
 
 			@Override
 			public Boolean output(NWEmuMsg message) {
-				// TODO
 				// Checks if there is an ongoing sending process
 				if (state.compareAndSet(waitForData, waitForACK) == false) {
 					return Boolean.FALSE;
 				}
 
+				// Building a new NWmu package
 				NWEmuPkt pkt = new NWEmuPkt();
 				pkt.seqnum = this.seqnum;
 
 				for (int i = 0; i < NWEmu.PAYSIZE; ++i) {
 					pkt.payload[i] = message.data[i];
 				}
-				
-				pkt.checksum = buildChecksum(pkt);
 
+				pkt.checksum = calculateChecksum(pkt);
+
+				// Update the current Package in case the package has to be sent again
 				currPackage = pkt;
+
+				// Send the package and start the timer
 				toLayer3(pkt);
 				startTimer(timerValue);
 
@@ -61,20 +72,22 @@ public class ABP {
 			}
 
 			@Override
-			public void input(NWEmuPkt packet) {
-				// TODO: check for transfer errors
+			public synchronized void input(NWEmuPkt packet) {
+
+				// Check if package is a delayed ACK and ignore it if so
 				if (state.get() == waitForData) {
 					return;
 				}
 
+				// Check for bit-errors and for the right ACK number
 				if (hasBiterror(packet) || packet.acknum != this.seqnum) {
 					return;
 				}
 
+				// No error -> stop timer, increment the sequence number and update state
 				stopTimer();
 				seqnum = (seqnum + 1) % 2;
 				state.set(waitForData);
-
 			}
 
 			@Override
@@ -84,6 +97,7 @@ public class ABP {
 
 			@Override
 			public void timerInterrupt() {
+				// Send the current package again
 				toLayer3(currPackage);
 				startTimer(timerValue);
 			}
@@ -91,7 +105,7 @@ public class ABP {
 
 		class ReceivingHost extends CommonHost {
 
-			NWEmuPkt lastACK = new NWEmuPkt();
+			NWEmuPkt lastACK; // Stores the last ACK in case it has to be sent again
 
 			@Override
 			public void init() {
@@ -99,25 +113,34 @@ public class ABP {
 			}
 
 			@Override
-			public void input(NWEmuPkt packet) {
-				// TODO
-				if (hasBiterror(packet) || packet.seqnum != this.seqnum) {
+			public synchronized void input(NWEmuPkt packet) {
+
+				// Check for bit-errors and the right sequence number
+				if (!hasBiterror(packet) && packet.seqnum == this.seqnum) {
+
+					// Extract the message from the package and deliver it to the upper layer
+					NWEmuMsg message = new NWEmuMsg();
+
+					for (int i = 0; i < NWEmu.PAYSIZE; ++i) {
+						message.data[i] = packet.payload[i];
+					}
+
+					toLayer5(message);
+
+					// Building the package for the ACK answer, send it and increment the sequence
+					// number
+					lastACK = new NWEmuPkt();
+					lastACK.acknum = packet.seqnum;
+					lastACK.checksum = calculateChecksum(lastACK);
 					toLayer3(lastACK);
-					return;
+					seqnum = (seqnum + 1) % 2;
+
+				} else if (packet.seqnum != seqnum) {
+
+					// In case the sender sent a package that has already been received, send the
+					// last ACK package again
+					toLayer3(lastACK);
 				}
-
-				NWEmuMsg message = new NWEmuMsg();
-
-				for (int i = 0; i < NWEmu.PAYSIZE; ++i) {
-					message.data[i] = packet.payload[i];
-				}
-
-				toLayer5(message);
-
-				lastACK.acknum = this.seqnum;
-				lastACK.checksum = this.buildChecksum(lastACK);
-				toLayer3(lastACK);
-				seqnum = (seqnum + 1) % 2;
 			}
 		}
 
@@ -128,7 +151,7 @@ public class ABP {
 
 		NWEmu TestEmu = new NWEmu(HostA, HostB);
 		TestEmu.randTimer();
-		TestEmu.emulate(50, 0.1, 0.2, 100.0, 1);
+		TestEmu.emulate(20, 0.1, 0.2, 100.0, 1);
 		// send 10 messages, no loss, no corruption, lambda 10, log level 1
 
 	}
